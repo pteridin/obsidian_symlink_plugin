@@ -70,64 +70,44 @@ export default class SymlinkPlugin extends Plugin {
 
       let command = "";
 
-      if (platform === "win32" && linkType === "symlink") {
-        // Windows uses mklink
-        // Syntax: mklink /D "targetPath" "sourcePath"
-        command = `mklink /D "${targetPath}" "${source}"`;
-      }
-      if (platform === "win32" && linkType === "junction") {
-        // Windows uses mklink
-        // Syntax: mklink /J "targetPath" "sourcePath"
-        command = `mklink /J "${targetPath}" "${source}"`;
-      } else {
-        // Unix/Linux uses ln -s
-        // Syntax: ln -s "sourcePath" "targetPath"
-        command = `ln -s "${source}" "${targetPath}"`;
+      console.log(`Creating symlink for ${platform} with link type ${linkType}`);
+      console.log(`platform === "win32": ${platform === "win32"}`);
+      console.log(`linkType === "symlink": ${linkType === "symlink"}`);
+
+      switch (platform) {
+        case "win32":
+          switch (linkType) {
+          case "symlink":
+            // Windows uses mklink
+            // Syntax: mklink /D "targetPath" "sourcePath"
+            command = `mklink /D "${targetPath}" "${source}"`;
+            break;
+          case "junction":
+            // Windows uses mklink
+            // Syntax: mklink /J "targetPath" "sourcePath"
+            command = `mklink /J "${targetPath}" "${source}"`;
+            break;
+          }
+          break;
+        default:
+          // Unix/Linux uses ln -s
+          // Syntax: ln -s "sourcePath" "targetPath"
+          command = `ln -s "${source}" "${targetPath}"`;
+          break;
       }
 
       // Execute the command
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          if (platform === "win32" && error.message.includes("permission")) {
-            // If permission denied on Windows, try creating a junction
-            //isSymlink = false;
-            const junctionCommand = `mklink /J "${targetPath}" "${source}"`;
-            exec(
-              junctionCommand,
-              (junctionError, junctionStdout, junctionStderr) => {
-                if (junctionError) {
-                  console.error(
-                    `Error creating junction: ${junctionError.message}`,
-                  );
-                  new Notice(
-                    `Error creating symlink/junction: ${junctionError.message}`,
-                  );
-                  return;
-                }
-                if (junctionStderr) {
-                  console.error(`Error: ${junctionStderr}`);
-                  new Notice(`Error: ${junctionStderr}`);
-                  return;
-                }
-                console.log(`Junction created successfully: ${junctionStdout}`);
-                new Notice("Junction created successfully.");
-              },
-            );
+          if (stderr) {
+            console.error(`Error: ${stderr}`);
+            new Notice(`Error: ${stderr}`);
             return;
           }
-
-          console.error(`Error creating symlink: ${error.message}`);
-          new Notice(`Error creating symlink: ${error.message}`);
-          return;
+        } else {
+          new Notice("Symlink created successfully.");
+          this.refreshAfterSymlink(targetPath);
         }
-        if (stderr) {
-          console.error(`Error: ${stderr}`);
-          new Notice(`Error: ${stderr}`);
-          return;
-        }
-        new Notice("Symlink created successfully.");
-
-        this.refreshAfterSymlink(targetPath);
       });
     }).open();
   }
@@ -188,7 +168,7 @@ export default class SymlinkPlugin extends Plugin {
 class SymlinkInputModal extends Modal {
   sourcePath = "";
   targetPath = "";
-  linkType = "symlink";
+  linkType = "junction";
   onSubmit: (source: string, target: string, symlink: string) => void;
 
   constructor(
@@ -239,8 +219,8 @@ class SymlinkInputModal extends Modal {
         .setDesc("Choose the type of link to create.")
         .addDropdown((dropdown) =>
           dropdown
-            .addOption("junction", "Directory Junction (Needs Admin)")
-            .addOption("symlink", "Symbolic Link (Default)")
+            .addOption("junction", "Directory Junction (Default)")
+            .addOption("symlink", "Symbolic Link (Across volumes, but needs admin!)")
             .setValue(this.linkType)
             .onChange((value) => {
               this.linkType = value as "junction" | "symlink";
