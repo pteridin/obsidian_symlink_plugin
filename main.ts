@@ -46,7 +46,7 @@ export default class SymlinkPlugin extends Plugin {
   }
 
   async createSymlink() {
-    new SymlinkInputModal(this.app, (source, target) => {
+    new SymlinkInputModal(this.app, (source, target, linkType) => {
       // Determine the OS
       const platform = os.platform();
 
@@ -70,10 +70,15 @@ export default class SymlinkPlugin extends Plugin {
 
       let command = "";
 
-      if (platform === "win32") {
+      if (platform === "win32" && linkType === "symlink") {
         // Windows uses mklink
         // Syntax: mklink /D "targetPath" "sourcePath"
         command = `mklink /D "${targetPath}" "${source}"`;
+      }
+      if (platform === "win32" && linkType === "junction") {
+        // Windows uses mklink
+        // Syntax: mklink /J "targetPath" "sourcePath"
+        command = `mklink /J "${targetPath}" "${source}"`;
       } else {
         // Unix/Linux uses ln -s
         // Syntax: ln -s "sourcePath" "targetPath"
@@ -172,7 +177,7 @@ export default class SymlinkPlugin extends Plugin {
     await this.refreshVault();
     await this.forceRefresh(path);
 
-    this.app.workspace.trigger("file-open", { path });
+    this.app.vault;
 
     if (path.split("/").length === 1) {
       await this.forceRefresh("");
@@ -183,9 +188,13 @@ export default class SymlinkPlugin extends Plugin {
 class SymlinkInputModal extends Modal {
   sourcePath = "";
   targetPath = "";
-  onSubmit: (source: string, target: string) => void;
+  linkType = "symlink";
+  onSubmit: (source: string, target: string, symlink: string) => void;
 
-  constructor(app: App, onSubmit: (source: string, target: string) => void) {
+  constructor(
+    app: App,
+    onSubmit: (source: string, target: string, symlink: string) => void,
+  ) {
     super(app);
     this.onSubmit = onSubmit;
   }
@@ -223,13 +232,29 @@ class SymlinkInputModal extends Modal {
       )
       .addText((text) => text.onChange((value) => (this.targetPath = value)));
 
+    // Link Type Dropdown (Windows Only)
+    if (os.platform() === "win32") {
+      new Setting(contentEl)
+        .setName("Link Type")
+        .setDesc("Choose the type of link to create.")
+        .addDropdown((dropdown) =>
+          dropdown
+            .addOption("junction", "Directory Junction (Needs Admin)")
+            .addOption("symlink", "Symbolic Link (Default)")
+            .setValue(this.linkType)
+            .onChange((value) => {
+              this.linkType = value as "junction" | "symlink";
+            }),
+        );
+    }
+
     new Setting(contentEl).addButton((button) =>
       button
         .setButtonText("Create")
         .setCta()
         .onClick(() => {
           if (this.sourcePath && this.targetPath) {
-            this.onSubmit(this.sourcePath, this.targetPath);
+            this.onSubmit(this.sourcePath, this.targetPath, this.linkType);
             this.close();
           } else {
             new Notice("Both paths are required.");
