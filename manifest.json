@@ -1,10 +1,10 @@
 {
   "id": "symlink-creator",
   "name": "Symlink Creator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "0.15.0",
   "description": "Create symlinks to files and folders inside and outside of your vault.",
   "author": "Tobias Heidler",
-  "authorUrl": "https://github.com/pteridin",
+  "authorUrl": "https://github.com/pteridin", 
   "isDesktopOnly": true
 }
