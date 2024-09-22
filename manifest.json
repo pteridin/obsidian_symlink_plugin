@@ -1,0 +1,11 @@
+{
+  "id": "symlink-creator",
+  "name": "Symlink Creator",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Create symlinks to files and folders inside and outside of your vault.",
+  "author": "Tobias Heidler",
+  "authorUrl": "https://obsidian.md",
+  "fundingUrl": "https://obsidian.md/pricing",
+  "isDesktopOnly": true
+}
