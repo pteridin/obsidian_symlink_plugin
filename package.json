@@ -13,7 +13,7 @@
     "management",
     "symlink"
   ],
-  "author": "Tobias Heidler <tobias.heidler@googlemail.com>",
+  "author": "Tobias Heidler",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.11.6",
