@@ -70,10 +70,6 @@ export default class SymlinkPlugin extends Plugin {
 
       let command = "";
 
-      console.log(`Creating symlink for ${platform} with link type ${linkType}`);
-      console.log(`platform === "win32": ${platform === "win32"}`);
-      console.log(`linkType === "symlink": ${linkType === "symlink"}`);
-
       switch (platform) {
         case "win32":
           switch (linkType) {
