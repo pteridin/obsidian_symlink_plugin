@@ -5,6 +5,7 @@ import {
   Plugin,
   Setting,
   TFolder,
+  Platform,
   normalizePath,
 } from "obsidian";
 import { exec } from "child_process";
@@ -30,7 +31,7 @@ export default class SymlinkPlugin extends Plugin {
 
     this.addCommand({
       id: "create-symlink",
-      name: "Create Symlink to Folder",
+      name: "Creates a symlink to a folder",
       callback: () => this.createSymlink(),
     });
   }
@@ -46,10 +47,12 @@ export default class SymlinkPlugin extends Plugin {
   }
 
   async createSymlink() {
-    new SymlinkInputModal(this.app, (source, target, linkType) => {
-      // Determine the OS
-      const platform = os.platform();
+    if (!Platform.isDesktop) {
+      new Notice("This plugin only works on desktop.");
+      return;
+    }
 
+    new SymlinkInputModal(this.app, (source, target, linkType) => {
       // Inside createSymlink or within the modal's onSubmit
       if (!fs.existsSync(source)) {
         new Notice(
@@ -70,9 +73,8 @@ export default class SymlinkPlugin extends Plugin {
 
       let command = "";
 
-      switch (platform) {
-        case "win32":
-          switch (linkType) {
+      if (Platform.isWin) {
+        switch (linkType) {
           case "symlink":
             // Windows uses mklink
             // Syntax: mklink /D "targetPath" "sourcePath"
@@ -83,13 +85,14 @@ export default class SymlinkPlugin extends Plugin {
             // Syntax: mklink /J "targetPath" "sourcePath"
             command = `mklink /J "${targetPath}" "${source}"`;
             break;
-          }
-          break;
-        default:
-          // Unix/Linux uses ln -s
-          // Syntax: ln -s "sourcePath" "targetPath"
-          command = `ln -s "${source}" "${targetPath}"`;
-          break;
+        }
+      } else if (Platform.isLinux || Platform.isMacOS) {
+        // Unix/Linux uses ln -s
+        // Syntax: ln -s "sourcePath" "targetPath"
+        command = `ln -s "${source}" "${targetPath}"`;
+      } else {
+        new Notice("Unsupported platform.");
+        return;
       }
 
       // Execute the command
@@ -177,16 +180,16 @@ class SymlinkInputModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Create Symlink" });
+    contentEl.createEl("h2", { text: "Create symlink" });
 
     new Setting(contentEl)
-      .setName("Source Directory")
+      .setName("Source directory")
       .setDesc(
         "This is the folder you want to create a symlink to. The source directory needs to exist.",
       )
       .addButton((button) =>
         button
-          .setButtonText("Choose Folder")
+          .setButtonText("Choose folder")
           .setCta()
           .onClick(async () => {
             const { remote } = window.require("electron");
@@ -202,21 +205,24 @@ class SymlinkInputModal extends Modal {
       );
 
     new Setting(contentEl)
-      .setName("Target Directory Path")
+      .setName("Target directory path")
       .setDesc(
         "This is the path where the symlink will be created. The target directory should not exist and will be newly created.",
       )
       .addText((text) => text.onChange((value) => (this.targetPath = value)));
 
     // Link Type Dropdown (Windows Only)
-    if (os.platform() === "win32") {
+    if (Platform.isWin) {
       new Setting(contentEl)
-        .setName("Link Type")
+        .setName("Link type")
         .setDesc("Choose the type of link to create.")
         .addDropdown((dropdown) =>
           dropdown
-            .addOption("junction", "Directory Junction (Default)")
-            .addOption("symlink", "Symbolic Link (Across volumes, but needs admin!)")
+            .addOption("junction", "Directory junction (default)")
+            .addOption(
+              "symlink",
+              "Symbolic link (across volumes, but needs admin!)",
+            )
             .setValue(this.linkType)
             .onChange((value) => {
               this.linkType = value as "junction" | "symlink";
