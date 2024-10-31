@@ -34,6 +34,12 @@ export default class SymlinkPlugin extends Plugin {
       name: "Creates a symlink to a folder",
       callback: () => this.createSymlink(),
     });
+
+    this.addCommand({
+      id: "create-symlink-file",
+      name: "Creates a symlink to a file",
+      callback: () => this.createSymlinkFile(),
+    });
   }
 
   onunload() {}
@@ -44,6 +50,58 @@ export default class SymlinkPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  async createSymlinkFile() {
+    if (!Platform.isDesktop) {
+      new Notice("This plugin only works on desktop.");
+      return;
+    }
+
+    new SymlinkFileInputModal(this.app, (source, target) => {
+      // Inside createSymlink or within the modal's onSubmit
+      if (!fs.existsSync(source)) {
+        new Notice(
+          "Source file path does not exist. Please ensure it does. Symlinks cannot be created if the source file path does not exist.",
+        );
+        return;
+      }
+
+      // Get active directory path
+      const targetPath = this.extendActivePath(target);
+
+      if (fs.existsSync(targetPath)) {
+        new Notice(
+          "Target file path exist. Please ensure it does not. Symlinks cannot be created if the target file path already exists.",
+        );
+        return;
+      }
+
+      let command = "";
+
+      if (Platform.isWin) {
+        command = `mklink "${targetPath}" "${source}"`;
+      } else if (Platform.isLinux || Platform.isMacOS) {
+        command = `ln -s "${source}" "${targetPath}"`;
+      } else {
+        new Notice("Unsupported platform.");
+        return;
+      }
+
+      // Execute the command
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          if (stderr) {
+            console.error(`Error: ${stderr}`);
+            new Notice(`Error: ${stderr}`);
+            return;
+          }
+        } else {
+          new Notice("Symlink created successfully.");
+          this.refreshAfterSymlink(targetPath);
+        }
+      });
+    }).open();
   }
 
   async createSymlink() {
@@ -237,6 +295,75 @@ class SymlinkInputModal extends Modal {
         .onClick(() => {
           if (this.sourcePath && this.targetPath) {
             this.onSubmit(this.sourcePath, this.targetPath, this.linkType);
+            this.close();
+          } else {
+            new Notice("Both paths are required.");
+          }
+        }),
+    );
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+
+class SymlinkFileInputModal extends Modal {
+  sourcePath = "";
+  targetPath = "";
+  onSubmit: (source: string, target: string) => void;
+
+  constructor(app: App, onSubmit: (source: string, target: string) => void) {
+    super(app);
+    this.onSubmit = onSubmit;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "Create symlink" });
+
+    let sourceDesc =
+      "This is the file you want to create a symlink to. The source file needs to exist.";
+    if (Platform.isWin) {
+      sourceDesc +=
+        " Please note: You need to activate 'Developer Mode' or need admin rights to create symlinks on Windows!";
+    }
+
+    new Setting(contentEl)
+      .setName("Source file")
+      .setDesc(sourceDesc)
+      .addButton((button) =>
+        button
+          .setButtonText("Choose file")
+          .setCta()
+          .onClick(async () => {
+            const { remote } = window.require("electron");
+            const selectedPaths = await remote.dialog.showOpenDialog({
+              properties: ["openFile"],
+            });
+            if (selectedPaths && selectedPaths.filePaths.length > 0) {
+              this.sourcePath = selectedPaths.filePaths[0];
+              // Update the button text or add a notice
+              button.setButtonText(basename(this.sourcePath));
+            }
+          }),
+      );
+
+    new Setting(contentEl)
+      .setName("Target file path")
+      .setDesc(
+        "This is the path where the symlink will be created. The target file path should not exist and will be newly created.",
+      )
+      .addText((text) => text.onChange((value) => (this.targetPath = value)));
+
+    new Setting(contentEl).addButton((button) =>
+      button
+        .setButtonText("Create")
+        .setCta()
+        .onClick(() => {
+          if (this.sourcePath && this.targetPath) {
+            this.onSubmit(this.sourcePath, this.targetPath);
             this.close();
           } else {
             new Notice("Both paths are required.");

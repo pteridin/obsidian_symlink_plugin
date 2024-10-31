@@ -1,7 +1,7 @@
 {
   "name": "symlink-creator",
-  "version": "0.1.2",
-  "description": "This plugin creates a symlink to a folder inside or outside of the vault.",
+  "version": "0.1.3",
+  "description": "This plugin creates a symlink to folders and files inside or outside of the vault.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
